@@ -24,5 +24,5 @@ export async function middleware(req) {
 }
 
 export const config = {
-  matcher: ['/', '/account'],
+  matcher: ['/', '/account', '/dashboard', '/add-vehicle'],
 }

@@ -1,4 +1,5 @@
 import UploadImage from "./upload-image";
+import VideoLink from "./video-link";
 
 export default function AddVehicleForm() {
 
@@ -39,10 +40,20 @@ export default function AddVehicleForm() {
             </select>
             <label htmlFor="description">Description</label>
             <textarea required name="description" className="bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+            <label>Videos</label>
+            <VideoLink />
             <label htmlFor="price">Price</label>
             <input name="price" className="bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-            <label htmlFor="salePrice">Sale Price</label>
-            <input name="salePrice" className="bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+            <div className="flex flex-row space-x-5">
+                <div className="flex flex-col space-y-3">
+                    <label htmlFor="featured">Featured</label>
+                    <input name="featured" type="checkbox" value={'TRUE'} className="cursor-pointer bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                </div>
+                <div className="flex flex-col space-y-3">
+                    <label htmlFor="homePage">Home Page</label>
+                    <input name="homePage" type="checkbox" value={'TRUE'} className="cursor-pointer bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                </div>
+            </div>
             <button className="p-2 bg-blue-800 font-semibold rounded-md">Submit</button>
         </form>
     )

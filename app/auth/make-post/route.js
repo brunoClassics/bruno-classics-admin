@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 export async function POST(request) {
     const requestUrl = new URL(request.url)
     const formData = await request.formData()
+    const title = formData.get('title')
     const year = formData.get('year')
     const make = formData.get('make')
     const model = formData.get('model')
@@ -19,6 +20,17 @@ export async function POST(request) {
     for( let i = 0; i < imageArrayLength; i++) {
         urlArray.push(formData.get(`url${i}`))
     }
+    const listingType = formData.get('listingType')
+    const description = formData.get('description')
+    const videoArrayLength = formData.get('videoArrayLength')
+    let vidArray = []
+    for(let i = 0; i < videoArrayLength; i++) {
+        vidArray.push(formData.get(`video${i}`))
+    }
+    const price = formData.get('price')
+    const featured = formData.get('featured')
+    const homePage = formData.get('homePage')
+    let slug = `${make}-${model}-${year}-${new Date().toISOString()}`;
     const cookieStore = cookies()
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
@@ -29,6 +41,7 @@ export async function POST(request) {
             .from('vehicles')
             .insert([
                 {
+                    title: title,
                     year: year,
                     make: make,
                     model: model,
@@ -40,15 +53,30 @@ export async function POST(request) {
                     engine: engine,
                     image_array_length: imageArrayLength,
                     image_url_array: urlArray,
+                    listing_type: listingType,
+                    description: description,
+                    video_array_length: videoArrayLength,
+                    video_url_array: vidArray,
+                    price: price,
+                    featured: featured,
+                    home_page: homePage,
+                    slug: slug,
                 },
             ])
             .select()
+
+            console.log('anything')
+        if(data) {
+            console.log(data)
+        }
         if (error) throw error
-        console.log()
+        
     } catch (error) {
+        alert('Error updating the data! ', error)
+        console.log('error')
         console.log(error)
-        console.log('Error updating the data!')
     } finally {
+        console.log('something')
         return NextResponse.redirect(`${requestUrl.origin}/dashboard`, {
             status: 301,
         })

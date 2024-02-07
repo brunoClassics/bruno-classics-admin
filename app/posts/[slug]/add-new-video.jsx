@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-export default function VideoLink() {
+export default function VideoLink({newVideos}) {
 
     const [numOfVideos, setNumOfVideos] = useState([])
 

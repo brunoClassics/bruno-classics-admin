@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
-export default function AddNewImage() {
+export default function AddNewImage({addImages}) {
     const supabase = createClientComponentClient();
     const [numberOfImages, setNumberOfImages] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(null);
@@ -156,6 +156,7 @@ export default function AddNewImage() {
                     <input key={index} value={url} name={`url${index}`} className="hidden" readOnly />
                 ))
             }
+            <div onClick={() => {addImages(urlArray)}} className="py-1 px-3 bg-blue-600 rounded-md cursor-pointer mx-auto mt-3 w-fit">Publish Added Pictures</div>
         </div>
     );
 }

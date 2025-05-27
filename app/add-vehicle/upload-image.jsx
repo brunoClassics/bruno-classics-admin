@@ -116,7 +116,7 @@ export default function UploadImage() {
                     <span>{item.file ? formatFileSize(item.file.size) : ''}</span>
                     {
                         item.file &&
-                        <Image
+                        <img
                             src={URL.createObjectURL(item.file)}
                             alt={item.id}
                             width={300}

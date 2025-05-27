@@ -116,7 +116,7 @@ export default function AddNewImage({addImages}) {
                     <span>{item.file ? formatFileSize(item.file.size) : ''}</span>
                     {
                         item.file &&
-                        <Image
+                        <img
                             src={URL.createObjectURL(item.file)}
                             alt={item.id}
                             width={150}

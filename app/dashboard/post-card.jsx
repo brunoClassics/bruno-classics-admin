@@ -8,7 +8,7 @@ export default function PostCard({ vehicle }) {
             {
                 (vehicle.image_url_array && vehicle.image_url_array[0]) &&
 
-                <Image
+                <img
                     src={vehicle.image_url_array[0]}
                     width={256}
                     height={158}

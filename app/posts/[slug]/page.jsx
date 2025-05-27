@@ -7,6 +7,7 @@ import AddNewImage from "./add-new-image"
 import LiteYouTubeEmbed from 'react-lite-youtube-embed';
 import 'react-lite-youtube-embed/dist/LiteYouTubeEmbed.css'
 import AddNewVideo from "./add-new-video"
+import DeleteVehicleButton from "./delete-vehicle"
 
 export default function Page({ params }) {
 
@@ -129,7 +130,7 @@ export default function Page({ params }) {
         const updatedVideos = [...videoUrlArray];
         const videosToRemove = [...removedVideos]
         videosToRemove.push(videoUrlArray[index])
-        setRemovedImages(videosToRemove)
+        setRemovedVideos(videosToRemove)
         updatedVideos.splice(index, 1);
         setVideoUrlArray(updatedVideos);
     }
@@ -185,6 +186,8 @@ export default function Page({ params }) {
         }
     };
 
+    
+
 
     return (
         <div className="w-full h-full m-5 border-2 border-blue-600 rounded-md p-5 text-white">
@@ -214,7 +217,7 @@ export default function Page({ params }) {
                         <label htmlFor="driveTrain">Drive Train</label>
                         <input value={driveTrain} onChange={(e) => { setDriveTrain(e.target.value) }} required name="driveTrain" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
                         <label htmlFor="engine">Engine</label>
-                        <input value={engine} onChange={(e) => { setDriveTrain(e.target.value) }} required name="engine" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <input value={engine} onChange={(e) => { setEngine(e.target.value) }} required name="engine" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
                         <label htmlFor="listingType">Listing Type</label>
                         <select value={listingType} onChange={(e) => { setListingType(e.target.value) }} required name="listingType" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" >
                             <option value={'For Sale'}>For Sale</option>
@@ -332,7 +335,9 @@ export default function Page({ params }) {
                     </div>
                 </div>
             }
+            <div className="flex flex-row">
             <div onClick={() => { publishEdits() }} className="w-fit p-3 rounded-md bg-blue-600 text-white mt-1 mx-auto cursor-pointer">Publish Changes</div>
+            <DeleteVehicleButton vehicleID={vehicleID} /></div>
         </div>
     )
 }

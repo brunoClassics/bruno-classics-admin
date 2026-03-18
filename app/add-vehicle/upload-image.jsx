@@ -39,7 +39,7 @@ export default function UploadImage() {
             const { error: uploadError } = await supabase.storage.from('vehicles').upload(filePath, file);
             console.log(filePath)
 
-            const newUrl = [...urlArray, `https://hffzexjxyqrqketevocr.supabase.co/storage/v1/object/public/vehicles/${filePath}`]
+            const newUrl = [...urlArray, filePath]
             setUrlArray(newUrl)
 
             if (uploadError) {

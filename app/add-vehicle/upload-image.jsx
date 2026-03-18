@@ -1,64 +1,43 @@
 'use client'
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
+import { useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function UploadImage() {
     const supabase = createClientComponentClient();
-    const [numberOfImages, setNumberOfImages] = useState([]);
-    const [currentIndex, setCurrentIndex] = useState(null);
-    const [urlArray, setUrlArray] = useState([])
+    const [imagesToUpload, setImagesToUpload] = useState([]); // {id, file, previewUrl}
+    const [fileNamesArray, setFileNamesArray] = useState([]); // stores only file names
 
-    useEffect(() => {
-        if (currentIndex !== null) {
-            const file = numberOfImages[currentIndex]?.file;
-            if (file) {
-                uploadImageToSupabase(file);
-            }
-        }
-    }, [currentIndex]);
-
+    // Handle file selection and compress + upload immediately
     const handleFileChange = (index, event) => {
         const file = event.target.files[0];
         if (file) {
-            compressImage(file, (compressedImage) => {
-                const newImages = [...numberOfImages];
-                newImages[index] = { id: `image${index + 1}`, file: compressedImage };
-                setCurrentIndex(index);
-                setNumberOfImages(newImages);
+            compressImage(file, async (compressedFile) => {
+                const newImages = [...imagesToUpload];
+                const previewUrl = URL.createObjectURL(compressedFile);
+
+                newImages[index] = { id: `image${index + 1}`, file: compressedFile, previewUrl };
+                setImagesToUpload(newImages);
+
+                // Upload to Supabase immediately
+                try {
+                    const fileExt = compressedFile.name.split('.').pop();
+                    const fileName = `${Math.random()}.${fileExt}`;
+                    const { error } = await supabase.storage.from('vehicles').upload(fileName, compressedFile);
+
+                    if (error) throw error;
+
+                    setFileNamesArray(prev => [...prev, fileName]); // store only file name
+                } catch (err) {
+                    console.error('Error uploading image:', err);
+                    alert('Failed to upload image.');
+                }
             });
         }
     };
 
-    const uploadImageToSupabase = async (file) => {
-        try {
-            const fileExt = file.name.split('.').pop();
-            const filePath = `${Math.random()}.${fileExt}`;
-
-            const { error: uploadError } = await supabase.storage.from('vehicles').upload(filePath, file);
-            console.log(filePath)
-
-            const newUrl = [...urlArray, filePath]
-            setUrlArray(newUrl)
-
-            if (uploadError) {
-                throw uploadError;
-            }
-        } catch (error) {
-            alert('Error uploading vehicle image!');
-        } finally {
-            console.log('success')
-        }
-    };
-
-    const handleRemoveImage = (id) => {
-        setNumberOfImages(prevImages => prevImages.filter(item => item.id !== id));
-    };
-
     const compressImage = (file, callback) => {
         const reader = new FileReader();
-
         reader.onload = (e) => {
             const img = new window.Image();
             img.src = e.target.result;
@@ -67,8 +46,8 @@ export default function UploadImage() {
                 const canvas = document.createElement("canvas");
                 const ctx = canvas.getContext("2d");
 
-                const maxWidth = 1920; // Set your desired maximum width
-                const maxHeight = 1080; // Set your desired maximum height
+                const maxWidth = 1920;
+                const maxHeight = 1080;
 
                 let width = img.width;
                 let height = img.height;
@@ -87,17 +66,23 @@ export default function UploadImage() {
 
                 canvas.width = width;
                 canvas.height = height;
-
                 ctx.drawImage(img, 0, 0, width, height);
 
                 canvas.toBlob((blob) => {
                     const compressedFile = new File([blob], file.name, { type: "image/jpeg" });
                     callback(compressedFile);
-                }, "image/jpeg", 0.9); // Adjust the quality as needed
+                }, "image/jpeg", 0.9);
             };
         };
-
         reader.readAsDataURL(file);
+    };
+
+    const addEmptyInput = () => {
+        setImagesToUpload(prev => [...prev, { id: `image${prev.length + 1}`, file: null, previewUrl: null }]);
+    };
+
+    const removeImage = (id) => {
+        setImagesToUpload(prev => prev.filter(img => img.id !== id));
     };
 
     const formatFileSize = (size) => {
@@ -110,51 +95,24 @@ export default function UploadImage() {
 
     return (
         <div>
-            {numberOfImages.map((item, index) => (
-                <div key={item.id} className="flex flex-row">
-                    <input type="file" name={item.id} onChange={(event) => handleFileChange(index, event)} />
-                    <span>{item.file ? formatFileSize(item.file.size) : ''}</span>
-                    {
-                        item.file &&
-                        <img
-                            src={URL.createObjectURL(item.file)}
-                            alt={item.id}
-                            width={300}
-                            height={300}
-                        />
-                    }
-                    <svg
-                        onClick={() => handleRemoveImage(item.id)}
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth={1.5}
-                        stroke="currentColor"
-                        className="w-6 h-6 cursor-pointer"
-                    >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                    </svg>
+            {imagesToUpload.map((img, index) => (
+                <div key={img.id} className="flex flex-row items-center space-x-2">
+                    <input type="file" onChange={(e) => handleFileChange(index, e)} />
+                    {img.file && <span>{formatFileSize(img.file.size)}</span>}
+                    {img.previewUrl && (
+                        <img src={img.previewUrl} alt={img.id} width={150} height={100} className="h-[100px]" />
+                    )}
+                    <button type="button" onClick={() => removeImage(img.id)} className="text-red-500 font-bold">X</button>
                 </div>
             ))}
-            <svg
-                onClick={() => {
-                    setNumberOfImages(prevImages => [...prevImages, { id: `image${prevImages.length + 1}`, file: null }]);
-                }}
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-6 h-6 cursor-pointer"
-            >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-            </svg>
-            <input className="hidden" type="number" name="imageArrayLength" readOnly value={numberOfImages.filter(obj => obj.file).length} />
-            {
-                urlArray.map((url, index) => (
-                    <input key={index} value={url} name={`url${index}`} className="hidden" readOnly />
-                ))
-            }
+
+            <button type="button" onClick={addEmptyInput} className="mt-2 px-3 py-1 bg-blue-600 rounded-md text-white">Add Image</button>
+
+            {/* Hidden inputs for form submission */}
+            <input type="hidden" name="imageArrayLength" value={imagesToUpload.filter(img => img.file).length} />
+            {fileNamesArray.map((fileName, index) => (
+                <input key={index} type="hidden" name={`url${index}`} value={fileName} />
+            ))}
         </div>
     );
 }

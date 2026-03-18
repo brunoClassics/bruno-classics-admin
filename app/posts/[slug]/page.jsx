@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import Image from "next/image"
 import AddNewImage from "./add-new-image"
 import LiteYouTubeEmbed from 'react-lite-youtube-embed';
 import 'react-lite-youtube-embed/dist/LiteYouTubeEmbed.css'
@@ -10,9 +9,10 @@ import AddNewVideo from "./add-new-video"
 import DeleteVehicleButton from "./delete-vehicle"
 
 export default function Page({ params }) {
-
     const supabase = createClientComponentClient()
     const decodedSlug = decodeURIComponent(params.slug)
+
+    // Vehicle info
     const [vehicle, setVehicle] = useState()
     const [vehicleID, setVehicleID] = useState()
     const [title, setTitle] = useState('')
@@ -25,20 +25,20 @@ export default function Page({ params }) {
     const [color, setColor] = useState('')
     const [driveTrain, setDriveTrain] = useState('')
     const [engine, setEngine] = useState('')
-    const [imageUrlArray, setImageUrlArray] = useState([])
-    const [imageArrayLength, setImageArrayLength] = useState(0)
+    
+    const [imageUrlArray, setImageUrlArray] = useState([]) // file names only
+    const [imagePreviewUrls, setImagePreviewUrls] = useState([]) // signed URLs for display
+    const [addedImageUrlsArray, setAddedImageUrlsArray] = useState([]) // newly added files
+    const [removedImages, setRemovedImages] = useState([])
+
     const [listingType, setListingType] = useState('')
     const [description, setDescription] = useState('')
     const [videoUrlArray, setVideoUrlArray] = useState([])
-    const [videoArrayLength, setVideoArrayLength] = useState(0)
     const [videosToAdd, setVideosToAdd] = useState([])
     const [price, setPrice] = useState('')
     const [featured, setFeatured] = useState('')
     const [homePage, setHomePage] = useState('')
-    const [slug, setSlug] = useState('')
-    const [removedImages, setRemovedImages] = useState([])
     const [removedVideos, setRemovedVideos] = useState([])
-    const [addedImageUrlsArray, setAddedImageUrlsArray] = useState([])
 
     useEffect(() => {
         fetchVehicleData()
@@ -52,6 +52,7 @@ export default function Page({ params }) {
                 .eq('slug', decodedSlug)
                 .single()
 
+            if (error) throw error
             if (data) {
                 setVehicle(data)
                 setVehicleID(data.id)
@@ -65,279 +66,244 @@ export default function Page({ params }) {
                 setColor(data.color)
                 setDriveTrain(data.drive_train)
                 setEngine(data.engine)
-                setImageUrlArray(data.image_url_array)
-                setImageArrayLength(data.image_array_length)
                 setListingType(data.listing_type)
                 setDescription(data.description)
                 setVideoUrlArray(data.video_url_array)
-                setVideoArrayLength(data.video_array_length)
                 setPrice(data.price)
                 setFeatured(data.featured)
                 setHomePage(data.home_page)
-            }
-            if (error) {
-                console.log(error)
-            }
 
+                const fileNames = data.image_url_array || []
+                setImageUrlArray(fileNames)
+
+                // Generate signed URLs for preview
+                const previews = await Promise.all(
+                    fileNames.map(async (fileName) => {
+                        const { data: signedUrlData, error: signedUrlError } = await supabase
+                            .storage
+                            .from('vehicles')
+                            .createSignedUrl(fileName, 300) // valid 5 minutes
+                        if (signedUrlError) {
+                            console.error('Error creating signed URL:', signedUrlError.message)
+                            return null
+                        }
+                        return signedUrlData.signedUrl
+                    })
+                )
+                setImagePreviewUrls(previews)
+            }
         } catch (error) {
-            throw error
+            console.error('Error fetching vehicle:', error)
         }
     }
 
-    const handleRemoveImage = (index) => {
-        const updatedImages = [...imageUrlArray];
-        const imagesToRemove = [...removedImages]
-        imagesToRemove.push(imageUrlArray[index])
-        removeFromBucket(imageUrlArray[index])
-        setRemovedImages(imagesToRemove)
-        updatedImages.splice(index, 1);
-        setImageUrlArray(updatedImages);
+    // Remove image from array and bucket
+    const handleRemoveImage = async (index) => {
+        const fileName = imageUrlArray[index]
+        const updatedFileNames = [...imageUrlArray]
+        const updatedPreviews = [...imagePreviewUrls]
 
+        updatedFileNames.splice(index, 1)
+        updatedPreviews.splice(index, 1)
 
+        setImageUrlArray(updatedFileNames)
+        setImagePreviewUrls(updatedPreviews)
+        setRemovedImages((prev) => [...prev, fileName])
+
+        // Remove from Supabase bucket
+        const { error } = await supabase.storage.from('vehicles').remove([fileName])
+        if (error) console.error('Error removing image from bucket:', error.message)
+        else console.log('Removed image:', fileName)
     }
-    const removeFromBucket = async (url) => {
 
-        const filePath = url.substring(url.lastIndexOf('/vehicles/') + '/vehicles/'.length)
+    // Add new images
+    const handleAddImage = async (fileNames) => {
+        if (!fileNames || fileNames.length === 0) return;
 
-        const { data, error } = await supabase
-            .storage
-            .from('vehicles')
-            .remove([filePath])
-        if (data) {
-            console.log('remove image: ' + filePath)
+        try {
+            // Generate signed URLs for preview
+            const signedUrls = await Promise.all(
+                fileNames.map(async (fileName) => {
+                    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                        .from('vehicles')
+                        .createSignedUrl(fileName, 300) // 5 minutes for admin preview
+                    if (signedUrlError) {
+                        console.error('Error generating signed URL:', signedUrlError.message);
+                        return null;
+                    }
+                    return signedUrlData.signedUrl;
+                })
+            );
+
+            const validSignedUrls = signedUrls.filter(Boolean);
+
+            // Update state: previews for display, file names for storage
+            setImagePreviewUrls((prev) => [...prev, ...validSignedUrls]);
+            setImageUrlArray((prev) => [...prev, ...fileNames]);
+            setAddedImageUrlsArray((prev) => [...prev, ...fileNames]);
+        } catch (error) {
+            console.error('Error adding new images:', error);
         }
-    }
+    };
 
-    const handleAddImage = (urls) => {
-        const newImages = [...imageUrlArray]
-        urls.forEach(url => {
-            newImages.push(url)
-        })
-
-        setImageUrlArray(newImages)
-        console.log(newImages)
-    }
-
-    const handleAddVideo = (file) => {
-        const newVideos = [...videoUrlArray]
-        newVideos.push(file)
-
-        setVideoUrlArray(newVideos)
-        console.log('a change has been made')
-    }
-
+    const handleAddVideo = (file) => setVideoUrlArray((prev) => [...prev, file])
     const handleRemoveVideo = (index) => {
-        const updatedVideos = [...videoUrlArray];
-        const videosToRemove = [...removedVideos]
-        videosToRemove.push(videoUrlArray[index])
-        setRemovedVideos(videosToRemove)
-        updatedVideos.splice(index, 1);
-        setVideoUrlArray(updatedVideos);
+        const removed = videoUrlArray[index]
+        setRemovedVideos((prev) => [...prev, removed])
+        setVideoUrlArray((prev) => prev.filter((_, i) => i !== index))
     }
 
     const publishEdits = async () => {
         try {
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('vehicles')
                 .upsert({
                     id: vehicleID,
-                    title: title,
-                    make: make,
-                    model: model,
-                    year: year,
+                    title,
+                    make,
+                    model,
+                    year,
                     special_edition: specialEdition,
                     mile_type: mileType,
-                    miles: miles,
-                    color: color,
+                    miles,
+                    color,
                     drive_train: driveTrain,
-                    engine: engine,
-                    image_url_array: imageUrlArray,
-                    // image_array_length: imageUrlArray.length(),
+                    engine,
+                    image_url_array, // only file names
                     listing_type: listingType,
-                    description: description,
+                    description,
                     video_url_array: videoUrlArray,
-                    // video_array_length: videoUrlArray.length(),
-                    price: price,
-                    featured: featured,
+                    price,
+                    featured,
                     home_page: homePage
                 })
-                .select()
-
-            if (data) {
-                setVehicle(data)
-                console.log(data)
-            }
-            if (error) {
-                console.log(error)
-            }
+            if (error) console.error('Error publishing edits:', error.message)
+            else console.log('Edits published!')
         } catch (error) {
-            throw error
-        } finally {
-            console.log('published')
+            console.error('Error publishing edits:', error)
         }
     }
 
     const handleCheckboxChange = (event) => {
-        const { name, checked } = event.target;
-        if (name === 'featured') {
-            setFeatured(checked ? 'TRUE' : '');
-        } else if (name === 'homePage') {
-            setHomePage(checked ? 'TRUE' : '');
-        }
-    };
-
-    
-
+        const { name, checked } = event.target
+        if (name === 'featured') setFeatured(checked ? 'TRUE' : '')
+        if (name === 'homePage') setHomePage(checked ? 'TRUE' : '')
+    }
 
     return (
         <div className="w-full h-full m-5 border-2 border-blue-600 rounded-md p-5 text-white">
-            {
-                vehicle &&
+            {vehicle && (
                 <div className="w-full h-full flex flex-row relative border-b-2 border-b-blue-600">
+                    {/* Left column: form fields */}
                     <div className="flex flex-col w-1/3 max-h-[75vh] overflow-y-scroll pr-4 pb-3 pl-1">
-                        <label htmlFor="title">Title</label>
-                        <input value={title} onChange={(e) => { setTitle(e.target.value) }} name="title" required className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="year">Year</label>
-                        <input value={year} onChange={(e) => { setYear(e.target.value) }} required name="year" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="make">Make</label>
-                        <input value={make} onChange={(e) => { setMake(e.target.value) }} required name="make" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="model">Model</label>
-                        <input value={model} onChange={(e) => { setModel(e.target.value) }} required name="model" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="specialEdition">Special Edition</label>
-                        <input value={specialEdition} onChange={(e) => { setSpecialEdition(e.target.value) }} name="specialEdition" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="mileType">Mile Type</label>
-                        <select value={mileType} onChange={(e) => { setMileType(e.target.value) }} required name="mileType" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" >
+                        <label>Title</label>
+                        <input value={title} onChange={(e) => setTitle(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Year</label>
+                        <input value={year} onChange={(e) => setYear(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Make</label>
+                        <input value={make} onChange={(e) => setMake(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Model</label>
+                        <input value={model} onChange={(e) => setModel(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Special Edition</label>
+                        <input value={specialEdition} onChange={(e) => setSpecialEdition(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Mile Type</label>
+                        <select value={mileType} onChange={(e) => setMileType(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md">
                             <option value={'Original'}>Original</option>
                             <option value={'Since Restoration'}>Since Restoration</option>
                         </select>
-                        <label htmlFor="miles">Miles</label>
-                        <input value={miles} onChange={(e) => { setMiles(e.target.value) }} required name="miles" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="color">Color</label>
-                        <input value={color} onChange={(e) => { setColor(e.target.value) }} required name="color" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="driveTrain">Drive Train</label>
-                        <input value={driveTrain} onChange={(e) => { setDriveTrain(e.target.value) }} required name="driveTrain" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="engine">Engine</label>
-                        <input value={engine} onChange={(e) => { setEngine(e.target.value) }} required name="engine" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="listingType">Listing Type</label>
-                        <select value={listingType} onChange={(e) => { setListingType(e.target.value) }} required name="listingType" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" >
+                        <label>Miles</label>
+                        <input value={miles} onChange={(e) => setMiles(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Color</label>
+                        <input value={color} onChange={(e) => setColor(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Drive Train</label>
+                        <input value={driveTrain} onChange={(e) => setDriveTrain(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Engine</label>
+                        <input value={engine} onChange={(e) => setEngine(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Listing Type</label>
+                        <select value={listingType} onChange={(e) => setListingType(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md">
                             <option value={'For Sale'}>For Sale</option>
                             <option value={'Coming Soon'}>Coming Soon</option>
                             <option value={'In The Shop'}>In The Shop</option>
                             <option value={'Sold'}>Sold</option>
                         </select>
-                        <label htmlFor="description">Description</label>
-                        <textarea value={description} onChange={(e) => { setDescription(e.target.value) }} required name="description" className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
-                        <label htmlFor="price">Price</label>
-                        <input value={price} onChange={(e) => { setPrice(e.target.value) }} name="price" className="bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Description</label>
+                        <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="pl-1 bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
+                        <label>Price</label>
+                        <input value={price} onChange={(e) => setPrice(e.target.value)} className="bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
                         <div className="flex flex-row space-x-5">
                             <div className="flex flex-col space-y-3">
-                                <label htmlFor="featured">Featured</label>
-                                <input
-                                    name="featured"
-                                    type="checkbox"
-                                    checked={featured === 'TRUE'}
-                                    onChange={handleCheckboxChange}
-                                    className="cursor-pointer bg-slate-900 py-1 border-2 border-blue-900 rounded-md"
-                                />
+                                <label>Featured</label>
+                                <input type="checkbox" name="featured" checked={featured === 'TRUE'} onChange={handleCheckboxChange} className="cursor-pointer bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
                             </div>
                             <div className="flex flex-col space-y-3">
-                                <label htmlFor="homePage">Home Page</label>
-                                <input
-                                    name="homePage"
-                                    type="checkbox"
-                                    checked={homePage === 'TRUE'}
-                                    onChange={handleCheckboxChange}
-                                    className="cursor-pointer bg-slate-900 py-1 border-2 border-blue-900 rounded-md"
-                                />
+                                <label>Home Page</label>
+                                <input type="checkbox" name="homePage" checked={homePage === 'TRUE'} onChange={handleCheckboxChange} className="cursor-pointer bg-slate-900 py-1 border-2 border-blue-900 rounded-md" />
                             </div>
                         </div>
                     </div>
+
+                    {/* Right column: images and videos */}
                     <div className="flex flex-col w-2/3 h-full sticky top-0">
                         <div className="flex flex-col px-3 max-h-[38vh] overflow-y-scroll">
                             <div className="flex flex-row flex-wrap">
-                                {
-                                    imageUrlArray.map((image, index) => (
-                                        <div key={index} className="relative">
-                                            <svg
-                                                onClick={() => handleRemoveImage(index)}
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                strokeWidth={1.5}
-                                                stroke="red"
-                                                className="w-6 h-6 cursor-pointer absolute top-0 right-0 z-50"
-                                            >
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                            </svg>
-                                            <img
-                                                src={image}
-                                                width={150}
-                                                height={100}
-                                                alt={`image${index}`}
-                                                className="h-[100px]"
-                                            />
-                                        </div>
-                                    ))
-                                }
-
+                                {imagePreviewUrls.map((signedUrl, index) => (
+                                    <div key={index} className="relative">
+                                        <svg
+                                            onClick={() => handleRemoveImage(index)}
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            strokeWidth={1.5}
+                                            stroke="red"
+                                            className="w-6 h-6 cursor-pointer absolute top-0 right-0 z-50"
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                        </svg>
+                                        <img
+                                            src={signedUrl}
+                                            width={150}
+                                            height={100}
+                                            alt={`image${index}`}
+                                            className="h-[100px]"
+                                        />
+                                    </div>
+                                ))}
                             </div>
                             <AddNewImage addImages={handleAddImage} />
-
                         </div>
+
+                        {/* Videos */}
                         <div className="flex flex-row px-3 w-full max-h-[38vh] mt-7 border-t-2 border-blue-600 pt-3">
                             <div className="h-[38vh] w-full overflow-y-scroll">
                                 <div className="flex flex-row flex-wrap space-x-3">
                                     {videoUrlArray.map((video, index) => (
                                         <div key={index} className="w-36 relative">
                                             <svg
-
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 fill="none"
                                                 viewBox="0 0 24 24"
                                                 strokeWidth={1.5}
                                                 stroke="red"
                                                 className="w-6 h-6 cursor-pointer absolute top-0 right-0 z-50"
-                                                onClick={() => { handleRemoveVideo(index) }}
+                                                onClick={() => handleRemoveVideo(index)}
                                             >
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                                             </svg>
-                                            <LiteYouTubeEmbed
-                                                id={video}
-                                                title="What’s new in Material Design for the web (Chrome Dev Summit 2019)"
-                                            />
+                                            <LiteYouTubeEmbed id={video} title={`Video ${index + 1}`} />
                                         </div>
                                     ))}
-                                    {
-                                        videosToAdd &&
-                                        videosToAdd.map((video, index) => (
-                                            <div key={index} className="w-36 relative">
-                                                <svg
-
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                    strokeWidth={1.5}
-                                                    stroke="red"
-                                                    className="w-6 h-6 cursor-pointer absolute top-0 right-0 z-50"
-                                                >
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                                </svg>
-                                                <LiteYouTubeEmbed
-                                                    id={video}
-                                                    title="What’s new in Material Design for the web (Chrome Dev Summit 2019)"
-                                                />
-                                            </div>
-                                        ))}
                                 </div>
                                 <AddNewVideo newVideos={handleAddVideo} />
                             </div>
                         </div>
                     </div>
                 </div>
-            }
+            )}
+
             <div className="flex flex-row">
-            <div onClick={() => { publishEdits() }} className="w-fit p-3 rounded-md bg-blue-600 text-white mt-1 mx-auto cursor-pointer">Publish Changes</div>
-            <DeleteVehicleButton vehicleID={vehicleID} /></div>
+                <div onClick={publishEdits} className="w-fit p-3 rounded-md bg-blue-600 text-white mt-1 mx-auto cursor-pointer">Publish Changes</div>
+                <DeleteVehicleButton vehicleID={vehicleID} />
+            </div>
         </div>
     )
 }

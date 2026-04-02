@@ -76,7 +76,7 @@ export default function Page({ params }) {
 
                 // Generate signed URLs for preview
                 const previews = await Promise.all(
-                    fileNames.map(async (fileName) => {
+                    imageUrlArray.map(async (fileName) => {
                         const { data: signedUrlData, error: signedUrlError } = await supabase
                             .storage
                             .from('vehicles')

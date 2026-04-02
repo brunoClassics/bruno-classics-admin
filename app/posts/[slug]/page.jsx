@@ -169,7 +169,7 @@ export default function Page({ params }) {
                     color,
                     drive_train: driveTrain,
                     engine,
-                    image_url_array, // only file names
+                    imageUrlArray, // only file names
                     listing_type: listingType,
                     description,
                     video_url_array: videoUrlArray,

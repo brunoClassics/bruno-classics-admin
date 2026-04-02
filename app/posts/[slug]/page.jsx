@@ -72,11 +72,13 @@ export default function Page({ params }) {
                 setPrice(data.price)
                 setFeatured(data.featured)
                 setHomePage(data.home_page)
-                setImageUrlArray(data.image_url_array)
+
+                const fileNames = data.image_url_array || []
+                setImageUrlArray(fileNames)
 
                 // Generate signed URLs for preview
                 const previews = await Promise.all(
-                    imageUrlArray.map(async (fileName) => {
+                    fileNames.map(async (fileName) => {
                         const { data: signedUrlData, error: signedUrlError } = await supabase
                             .storage
                             .from('vehicles')
@@ -157,22 +159,22 @@ export default function Page({ params }) {
                 .from('vehicles')
                 .upsert({
                     id: vehicleID,
-                    title,
-                    make,
-                    model,
-                    year,
+                    title: title,
+                    make: make,
+                    model: model,
+                    year: year,
                     special_edition: specialEdition,
                     mile_type: mileType,
-                    miles,
-                    color,
+                    miles: miles,
+                    color: color,
                     drive_train: driveTrain,
-                    engine,
-                    image_url_array, // only file names
+                    engine: engine,
+                    image_url_array: imageUrlArray, // only file names
                     listing_type: listingType,
-                    description,
+                    description: description,
                     video_url_array: videoUrlArray,
-                    price,
-                    featured,
+                    price: price,
+                    featured: featured,
                     home_page: homePage
                 })
             if (error) console.error('Error publishing edits:', error.message)

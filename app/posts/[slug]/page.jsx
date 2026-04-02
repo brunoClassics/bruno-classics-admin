@@ -72,9 +72,7 @@ export default function Page({ params }) {
                 setPrice(data.price)
                 setFeatured(data.featured)
                 setHomePage(data.home_page)
-
-                const fileNames = data.image_url_array || []
-                setImageUrlArray(fileNames)
+                setImageUrlArray(data.image_url_array)
 
                 // Generate signed URLs for preview
                 const previews = await Promise.all(
@@ -169,7 +167,7 @@ export default function Page({ params }) {
                     color,
                     drive_train: driveTrain,
                     engine,
-                    imageUrlArray, // only file names
+                    image_url_array, // only file names
                     listing_type: listingType,
                     description,
                     video_url_array: videoUrlArray,
